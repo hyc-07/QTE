@@ -550,7 +550,9 @@
     });
 
     // 游戏区域点击（PC）
-    gameArea.addEventListener('click', e => {
+    // 全局点击：空白 / 游戏区均可触发
+    document.addEventListener('click', e => {
+        if (e.target.id === 'sfxToggle') return;
         e.preventDefault();
         onGameTap();
     });
