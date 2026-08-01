@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>hyc-QTE</title>
+    <title>hyc_QTE</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -54,7 +54,7 @@
             opacity: .85;
         }
         .progress-bar {
-            width: 260px;
+            width: 210px;
             height: 6px;
             background: #222;
             border: 1px solid #555;
@@ -73,6 +73,35 @@
             font-size: 16px;
             height: 24px;
             color: #ccc;
+        }
+
+        /* ===== 音效开关 ===== */
+        .sfx-toggle {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            width: 40px;
+            height: 40px;
+            border: 2px solid #666;
+            border-radius: 8px;
+            background: rgba(20,20,20,.9);
+            color: #fff;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: border-color .2s, background .2s;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .sfx-toggle:hover {
+            border-color: #999;
+            background: rgba(60,60,60,.9);
+        }
+        .sfx-toggle:active {
+            background: #555;
         }
 
         /* ===== 结算弹窗 ===== */
@@ -147,9 +176,11 @@
 </head>
 <body>
 
+<button class="sfx-toggle" id="sfxToggle" title="音效开关">🔊</button>
+
 <div class="qte-wrapper">
     <div class="status-text" id="statusText">Tap/Space开始！</div>
-    <div class="qte-container">
+    <div class="qte-container" id="gameArea">
         <canvas id="ringCanvas" width="300" height="300"></canvas>
         <div class="hint" id="hintBtn">TAP/SPACE</div>
     </div>
@@ -188,31 +219,12 @@
     const gameOverWin = document.getElementById('gameOverWin');
     const finalRoundFail = document.getElementById('finalRoundFail');
     const finalRoundWin = document.getElementById('finalRoundWin');
+    const gameArea = document.getElementById('gameArea');
 
     const cx = 150, cy = 150, radius = 100;
 
     const urlParams = new URLSearchParams(window.location.search);
-    const totalRounds = Math.max(1, parseInt(urlParams.get('rounds')) || 16);
-
-    let currentRound = 0;
-    let progress = 0;
-    const normalFill = 1 / totalRounds;
-    const perfectFill = 1.3 / totalRounds;
-
-    let rotationAngle = 0;
-    let baseSpeed = 0.06;
-    let rotationSpeed = 0.06;
-    let direction = 1;
-
-    const thickAngle = Math.PI / 4;
-    let startAngle, endAngle;
-    const targetHalfAngle = 0.10;
-    let targetAngle;
-
-    let phase = 'waiting';
-    let hasEnteredThick = false;
-    const speedIncrement = 0.004;
-    let animFrameId = null;
+    const totalRounds = Math.max(1, parseInt(urlParams.get('rounds')) || 18);
 
     /* ===== 音效系统 ===== */
     const SFX_FILES = {
@@ -224,7 +236,23 @@
     };
 
     const sfx = {};
-    let sfxEnabled = true;
+
+    // 从 localStorage 读取音效开关状态
+    const STORAGE_KEY = 'qte_sfx_enabled';
+    let sfxEnabled = localStorage.getItem(STORAGE_KEY) !== 'false';
+
+    /* ===== 音效开关按钮 ===== */
+    const sfxToggleBtn = document.getElementById('sfxToggle');
+    // 初始化图标
+    sfxToggleBtn.textContent = sfxEnabled ? '🔊' : '🔇';
+
+    sfxToggleBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        sfxEnabled = !sfxEnabled;
+        sfxToggleBtn.textContent = sfxEnabled ? '🔊' : '🔇';
+        // 写入本地存储
+        localStorage.setItem(STORAGE_KEY, sfxEnabled);
+    });
 
     function initSfx() {
         for (const [key, file] of Object.entries(SFX_FILES)) {
@@ -246,7 +274,8 @@
         } catch(e) {}
     }
 
-    function unlockAudio() {
+    function unlockAudio(e) {
+        if (e && e.target && e.target.id === 'sfxToggle') return;
         if (!sfxEnabled) return;
         for (const key in sfx) {
             const a = sfx[key];
@@ -261,6 +290,27 @@
     document.addEventListener('click', unlockAudio, { once: true });
     document.addEventListener('touchstart', unlockAudio, { once: true });
     document.addEventListener('keydown', unlockAudio, { once: true });
+
+    /* ===== 游戏状态变量 ===== */
+    let currentRound = 0;
+    let progress = 0;
+    const normalFill = 1 / totalRounds;
+    const perfectFill = 1.3 / totalRounds;
+
+    let rotationAngle = 0;
+    let baseSpeed = 0.06;
+    let rotationSpeed = 0.06;
+    let direction = 1;
+
+    const thickAngle = Math.PI/(180/50);
+    let startAngle, endAngle;
+    const targetHalfAngle = 0.10;
+    let targetAngle;
+
+    let phase = 'waiting';
+    let hasEnteredThick = false;
+    const speedIncrement = 0.004;
+    let animFrameId = null;
 
     /* ===== 工具函数 ===== */
     function normalizeAngle(a) {
@@ -319,6 +369,26 @@
         playSfx('fail');
         gameOverFail.classList.add('show');
         finalRoundFail.textContent = `破译了 ${currentRound} 轮，进度 ${(progress * 100).toFixed(0)}%`;
+    }
+
+    /* ===== 重置游戏（不刷新页面）===== */
+    function resetGame() {
+        cancelAnimationFrame(animFrameId);
+
+        currentRound = 0;
+        progress = 0;
+        rotationAngle = 0;
+        baseSpeed = 0.06;
+        rotationSpeed = 0.06;
+        direction = 1;
+        phase = 'waiting';
+        hasEnteredThick = false;
+
+        progressFill.style.width = '0%';
+        gameOverFail.classList.remove('show');
+        gameOverWin.classList.remove('show');
+
+        draw();
     }
 
     /* ===== 绘制 ===== */
@@ -462,23 +532,8 @@
         }
     }
 
-    /* ===== 输入处理（核心修改区）===== */
-
-    // 判断是否是重新开始按钮
-    function isRestartButton(target) {
-        return target.closest('#restartBtnFail, #restartBtnWin');
-    }
-
-    // 防重复触发
-    let tapTriggered = false;
-    function onTapWithDebounce() {
-        if (tapTriggered) return;
-        tapTriggered = true;
-        onTap();
-        requestAnimationFrame(() => { tapTriggered = false; });
-    }
-
-    function onTap() {
+    /* ===== 输入处理 ===== */
+    function onGameTap() {
         if (phase === 'waiting') {
             startGame();
         } else if (phase === 'calibrating') {
@@ -486,29 +541,27 @@
         }
     }
 
-    // 键盘：空格 = 点击空白
+    // 键盘
     document.addEventListener('keydown', e => {
         if (e.code === 'Space' || e.key === ' ') {
             e.preventDefault();
-            onTap();
+            onGameTap();
         }
     });
 
-    // 点击：空白 = 空格，按钮除外
-    document.addEventListener('click', e => {
-        if (isRestartButton(e.target)) return;
+    // 游戏区域点击（PC）
+    gameArea.addEventListener('click', e => {
         e.preventDefault();
-        onTapWithDebounce();
+        onGameTap();
     });
 
-    // 触摸：空白 = 空格，按钮除外
-    document.addEventListener('touchstart', e => {
-        if (isRestartButton(e.target)) return;
+    // 游戏区域触摸（移动端）
+    gameArea.addEventListener('touchend', e => {
         e.preventDefault();
-        onTapWithDebounce();
+        onGameTap();
     }, { passive: false });
 
-    // 阻止双击缩放 / 长按菜单（不影响按钮）
+    // 阻止 iOS 缩放 / 长按菜单
     document.addEventListener('dblclick', e => e.preventDefault());
     document.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -521,16 +574,14 @@
         }, 1500);
     }
 
-    // 重新开始按钮（完全独立）
+    // 重新开始按钮 → 不刷新页面，仅重置状态
     document.getElementById('restartBtnFail').addEventListener('click', e => {
         e.stopPropagation();
-        cancelAnimationFrame(animFrameId);
-        location.reload();
+        resetGame();
     });
     document.getElementById('restartBtnWin').addEventListener('click', e => {
         e.stopPropagation();
-        cancelAnimationFrame(animFrameId);
-        location.reload();
+        resetGame();
     });
 
     draw();
