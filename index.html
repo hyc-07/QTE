@@ -91,7 +91,6 @@
             display: flex;
         }
 
-        /* 弹窗内容容器，控制整体排版 */
         .game-over .panel {
             display: flex;
             flex-direction: column;
@@ -110,12 +109,8 @@
             letter-spacing: 4px;
             margin: 0;
         }
-        .game-over.fail h1 {
-            color: #f44;
-        }
-        .game-over.win h1 {
-            color: #0f0;
-        }
+        .game-over.fail h1 { color: #f44; }
+        .game-over.win h1 { color: #0f0; }
 
         .game-over .subtitle {
             font-size: 16px;
@@ -154,7 +149,7 @@
 
 <div class="qte-wrapper">
     <div class="status-text" id="statusText">Tap/Space开始！</div>
-    <div class="qte-container">
+    <div class="qte-container" id="gameArea">
         <canvas id="ringCanvas" width="300" height="300"></canvas>
         <div class="hint" id="hintBtn">TAP/SPACE</div>
     </div>
@@ -193,10 +188,10 @@
     const gameOverWin = document.getElementById('gameOverWin');
     const finalRoundFail = document.getElementById('finalRoundFail');
     const finalRoundWin = document.getElementById('finalRoundWin');
+    const gameArea = document.getElementById('gameArea');
 
     const cx = 150, cy = 150, radius = 100;
 
-    // 从 URL 参数读取 totalRounds，没有或非法则默认 16
     const urlParams = new URLSearchParams(window.location.search);
     const totalRounds = Math.max(1, parseInt(urlParams.get('rounds')) || 16);
 
@@ -212,29 +207,26 @@
 
     const thickAngle = Math.PI / 4;
     let startAngle, endAngle;
-
     const targetHalfAngle = 0.10;
     let targetAngle;
 
     let phase = 'waiting';
     let hasEnteredThick = false;
     const speedIncrement = 0.004;
-
     let animFrameId = null;
 
     /* ===== 音效系统 ===== */
     const SFX_FILES = {
-        perfect:   'sfx_perfect.mp3',   // 完美校准
-        normal:    'sfx_normal.mp3',    // 普通校准
-        start:     'sfx_start.mp3',     // 开始破译
-        win:       'sfx_win.mp3',       // 成功结算
-        fail:      'sfx_fail.mp3'       // 失败结算
+        perfect: 'sfx_perfect.mp3',
+        normal: 'sfx_normal.mp3',
+        start: 'sfx_start.mp3',
+        win: 'sfx_win.mp3',
+        fail: 'sfx_fail.mp3'
     };
 
     const sfx = {};
     let sfxEnabled = true;
 
-    // 初始化：预加载所有音效
     function initSfx() {
         for (const [key, file] of Object.entries(SFX_FILES)) {
             const audio = new Audio(file);
@@ -244,7 +236,6 @@
         }
     }
 
-    // 播放指定音效（每次创建新实例，支持快速连播不截断）
     function playSfx(key) {
         if (!sfxEnabled) return;
         const src = sfx[key];
@@ -252,11 +243,10 @@
         try {
             const clone = src.cloneNode(true);
             clone.volume = 1.0;
-            clone.play().catch(() => { /* 浏览器自动播放限制，静默忽略 */ });
+            clone.play().catch(() => {});
         } catch(e) {}
     }
 
-    // 用户首次交互后解锁音频（iOS 必须）
     function unlockAudio() {
         if (!sfxEnabled) return;
         for (const key in sfx) {
@@ -269,7 +259,6 @@
     }
 
     initSfx();
-    // 监听首次交互以解锁音频上下文
     document.addEventListener('click', unlockAudio, { once: true });
     document.addEventListener('touchstart', unlockAudio, { once: true });
     document.addEventListener('keydown', unlockAudio, { once: true });
@@ -337,14 +326,12 @@
     function draw() {
         ctx.clearRect(0, 0, 300, 300);
 
-        // 外圈细环
         ctx.beginPath();
         ctx.arc(cx, cy, radius, 0, Math.PI * 2);
         ctx.lineWidth = 3;
         ctx.strokeStyle = '#fff';
         ctx.stroke();
 
-        // 加粗段 + 目标
         if (['calibrating', 'done', 'dead'].includes(phase)) {
             const outer = radius + 6;
             const inner = radius - 6;
@@ -385,7 +372,6 @@
             ctx.lineTo(points[3].x, points[3].y);
             ctx.stroke();
 
-            // 白色目标标记
             ctx.beginPath();
             ctx.arc(cx, cy, outer, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
             ctx.arc(cx, cy, inner, targetAngle + targetHalfAngle, targetAngle - targetHalfAngle, true);
@@ -394,7 +380,6 @@
             ctx.fill();
         }
 
-        // 红色指针
         if (phase !== 'waiting') {
             const innerR = radius - 42;
             const outerR = radius + 42;
@@ -426,7 +411,6 @@
             ctx.fill();
         }
 
-        /* ===== 核心逻辑 ===== */
         if (phase === 'calibrating') {
             rotationAngle += rotationSpeed;
             rotationAngle = normalizeAngle(rotationAngle);
@@ -479,8 +463,8 @@
         }
     }
 
-    /* ===== 输入处理 ===== */
-    function onTap() {
+    /* ===== 输入处理（核心优化点）===== */
+    function onGameTap() {
         if (phase === 'waiting') {
             startGame();
         } else if (phase === 'calibrating') {
@@ -488,7 +472,31 @@
         }
     }
 
-    // 开局流程：等 1.5 秒后播放开始音效，再进入第一轮
+    // 键盘
+    document.addEventListener('keydown', e => {
+        if (e.code === 'Space' || e.key === ' ') {
+            e.preventDefault();
+            onGameTap();
+        }
+    });
+
+    // 游戏区域点击（PC）
+    gameArea.addEventListener('click', e => {
+        e.preventDefault();
+        onGameTap();
+    });
+
+    // 游戏区域触摸（移动端，使用 touchend 更自然）
+    gameArea.addEventListener('touchend', e => {
+        e.preventDefault();
+        onGameTap();
+    }, { passive: false });
+
+    // 阻止 iOS 缩放 / 长按菜单（不影响按钮）
+    document.addEventListener('dblclick', e => e.preventDefault());
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // 开局
     function startGame() {
         phase = 'starting';
         playSfx('start');
@@ -497,58 +505,16 @@
         }, 1500);
     }
 
-    // 空格键（PC）
-    document.addEventListener('keydown', e => {
-        if (e.code === 'Space' || e.key === ' ') {
-            e.preventDefault();
-            onTap();
-        }
-    });
-
-    // 防重复触发
-    let tapTriggered = false;
-    function onTapWithDebounce() {
-        if (tapTriggered) return;
-        tapTriggered = true;
-        onTap();
-        requestAnimationFrame(() => { tapTriggered = false; });
-    }
-
-    // 点击（PC + 手机）
-    document.addEventListener('click', function(e) {
-        e.preventDefault();
-        onTapWithDebounce();
-    });
-
-    // 触摸（手机）
-    document.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        onTapWithDebounce();
-    }, { passive: false });
-
-    // 阻止双击缩放
-    document.addEventListener('dblclick', function(e) {
-        e.preventDefault();
-    });
-
-    // 阻止iOS长按菜单
-    document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-    });
-
-    // 重开按钮
-    document.getElementById('restartBtnFail').addEventListener('click', function(e) {
-        e.stopPropagation();
+    // 重新开始按钮（不再被全局拦截）
+    document.getElementById('restartBtnFail').addEventListener('click', () => {
         cancelAnimationFrame(animFrameId);
         location.reload();
     });
-    document.getElementById('restartBtnWin').addEventListener('click', function(e) {
-        e.stopPropagation();
+    document.getElementById('restartBtnWin').addEventListener('click', () => {
         cancelAnimationFrame(animFrameId);
         location.reload();
     });
 
-    // 启动
     draw();
 </script>
 </body>
