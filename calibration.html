@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>QTE</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            height: 100dvh;
+            font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+            color: #fff;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .qte-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .qte-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .hint {
+            z-index: 10;
+            font-size: 14px;
+            background: #000;
+            border: 2px solid #aaa;
+            border-radius: 6px;
+            padding: 6px 16px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+            box-shadow: 0 0 8px rgba(255,255,255,.3);
+            pointer-events: none;
+            opacity: .85;
+        }
+        .progress-bar {
+            width: 260px;
+            height: 6px;
+            background: #222;
+            border: 1px solid #555;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: #fff;
+            border-radius: 2px;
+            transition: width .15s ease;
+        }
+        .status-text {
+            display: none;
+            font-size: 16px;
+            height: 24px;
+            color: #ccc;
+        }
+
+        /* ===== 结算弹窗 ===== */
+        .game-over {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 0;
+            z-index: 999;
+        }
+        .game-over.show {
+            display: flex;
+        }
+
+        /* 弹窗内容容器，控制整体排版 */
+        .game-over .panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 18px;
+            padding: 40px 50px;
+            border: 2px solid #555;
+            border-radius: 12px;
+            background: rgba(20,20,20,.95);
+            min-width: 280px;
+        }
+
+        .game-over h1 {
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            margin: 0;
+        }
+        .game-over.fail h1 {
+            color: #f44;
+        }
+        .game-over.win h1 {
+            color: #0f0;
+        }
+
+        .game-over .subtitle {
+            font-size: 16px;
+            color: #aaa;
+            margin: 0;
+        }
+
+        .game-over .stats {
+            font-size: 14px;
+            color: #888;
+            margin: 0;
+        }
+
+        .game-over button {
+            margin-top: 8px;
+            font-size: 15px;
+            padding: 10px 36px;
+            background: #222;
+            color: #fff;
+            border: 2px solid #666;
+            border-radius: 8px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: background .2s, border-color .2s;
+        }
+        .game-over button:hover {
+            background: #444;
+            border-color: #999;
+        }
+        .game-over button:active {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+
+<div class="qte-wrapper">
+    <div class="status-text" id="statusText">Tap/Space开始！</div>
+    <div class="qte-container">
+        <canvas id="ringCanvas" width="300" height="300"></canvas>
+        <div class="hint" id="hintBtn">TAP/SPACE</div>
+    </div>
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+    </div>
+</div>
+
+<!-- 失败结算 -->
+<div class="game-over fail" id="gameOverFail">
+    <div class="panel">
+        <h1>校准失败</h1>
+        <p class="subtitle">破译中断</p>
+        <p class="stats" id="finalRoundFail"></p>
+        <button id="restartBtnFail">重新开始</button>
+    </div>
+</div>
+
+<!-- 成功结算 -->
+<div class="game-over win" id="gameOverWin">
+    <div class="panel">
+        <h1>校准成功</h1>
+        <p class="subtitle">全部校准完成</p>
+        <p class="stats" id="finalRoundWin"></p>
+        <button id="restartBtnWin">重新开始</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('ringCanvas');
+    const ctx = canvas.getContext('2d');
+    const progressFill = document.getElementById('progressFill');
+    const statusText = document.getElementById('statusText');
+    const hintBtn = document.getElementById('hintBtn');
+    const gameOverFail = document.getElementById('gameOverFail');
+    const gameOverWin = document.getElementById('gameOverWin');
+    const finalRoundFail = document.getElementById('finalRoundFail');
+    const finalRoundWin = document.getElementById('finalRoundWin');
+
+    const cx = 150, cy = 150, radius = 100;
+
+    // 从 URL 参数读取 totalRounds，没有或非法则默认 16
+    const urlParams = new URLSearchParams(window.location.search);
+    const totalRounds = Math.max(1, parseInt(urlParams.get('rounds')) || 16);
+
+    let currentRound = 0;
+    let progress = 0;
+    const normalFill = 1 / totalRounds;
+    const perfectFill = 1.3 / totalRounds;
+
+    let rotationAngle = 0;
+    let baseSpeed = 0.06;
+    let rotationSpeed = 0.06;
+    let direction = 1;
+
+    const thickAngle = Math.PI / 4;
+    let startAngle, endAngle;
+
+    const targetHalfAngle = 0.10;
+    let targetAngle;
+
+    let phase = 'waiting';
+    let hasEnteredThick = false;
+    const speedIncrement = 0.004;
+
+    let animFrameId = null;
+
+    /* ===== 音效系统 ===== */
+    const SFX_FILES = {
+        perfect:   'sfx_perfect.mp3',   // 完美校准
+        normal:    'sfx_normal.mp3',    // 普通校准
+        start:     'sfx_start.mp3',     // 开始破译
+        win:       'sfx_win.mp3',       // 成功结算
+        fail:      'sfx_fail.mp3'       // 失败结算
+    };
+
+    const sfx = {};
+    let sfxEnabled = true;
+
+    // 初始化：预加载所有音效
+    function initSfx() {
+        for (const [key, file] of Object.entries(SFX_FILES)) {
+            const audio = new Audio(file);
+            audio.preload = 'auto';
+            audio.volume = 1.0;
+            sfx[key] = audio;
+        }
+    }
+
+    // 播放指定音效（每次创建新实例，支持快速连播不截断）
+    function playSfx(key) {
+        if (!sfxEnabled) return;
+        const src = sfx[key];
+        if (!src) return;
+        try {
+            const clone = src.cloneNode(true);
+            clone.volume = 1.0;
+            clone.play().catch(() => { /* 浏览器自动播放限制，静默忽略 */ });
+        } catch(e) {}
+    }
+
+    // 用户首次交互后解锁音频（iOS 必须）
+    function unlockAudio() {
+        if (!sfxEnabled) return;
+        for (const key in sfx) {
+            const a = sfx[key];
+            a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+        }
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('keydown', unlockAudio);
+    }
+
+    initSfx();
+    // 监听首次交互以解锁音频上下文
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+
+    /* ===== 工具函数 ===== */
+    function normalizeAngle(a) {
+        while (a < 0) a += Math.PI * 2;
+        while (a >= Math.PI * 2) a -= Math.PI * 2;
+        return a;
+    }
+
+    function angleInRange(a, s, e) {
+        a = normalizeAngle(a);
+        s = normalizeAngle(s);
+        e = normalizeAngle(e);
+        return s <= e ? (a >= s && a <= e) : (a >= s || a <= e);
+    }
+
+    function angleToPoint(a, r) {
+        return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+    }
+
+    /* ===== 生成本轮数据 ===== */
+    function nextRound() {
+        currentRound++;
+        const cur = normalizeAngle(rotationAngle);
+        const dist = Math.PI * (0.5 + Math.random() * 0.35);
+        const thickCenter = normalizeAngle(cur + dist * direction);
+
+        startAngle = normalizeAngle(thickCenter - thickAngle / 2);
+        endAngle = normalizeAngle(thickCenter + thickAngle / 2);
+
+        const targetRange = thickAngle - targetHalfAngle * 2;
+        targetAngle = normalizeAngle(startAngle + targetHalfAngle + Math.random() * targetRange);
+
+        direction *= -1;
+        rotationSpeed = baseSpeed * direction;
+        phase = 'calibrating';
+        hasEnteredThick = false;
+    }
+
+    /* ===== 进度 & 胜负 ===== */
+    function updateProgress(v) {
+        progress = Math.min(progress + v, 1);
+        progressFill.style.width = (progress * 100).toFixed(1) + '%';
+    }
+
+    function checkWin() {
+        phase = 'done';
+        cancelAnimationFrame(animFrameId);
+        playSfx('win');
+        gameOverWin.classList.add('show');
+        finalRoundWin.textContent = `共 ${currentRound} 轮，完成度 100%`;
+    }
+
+    function explode() {
+        phase = 'dead';
+        cancelAnimationFrame(animFrameId);
+        playSfx('fail');
+        gameOverFail.classList.add('show');
+        finalRoundFail.textContent = `破译了 ${currentRound} 轮，进度 ${(progress * 100).toFixed(0)}%`;
+    }
+
+    /* ===== 绘制 ===== */
+    function draw() {
+        ctx.clearRect(0, 0, 300, 300);
+
+        // 外圈细环
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+
+        // 加粗段 + 目标
+        if (['calibrating', 'done', 'dead'].includes(phase)) {
+            const outer = radius + 6;
+            const inner = radius - 6;
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, outer, startAngle, endAngle);
+            ctx.arc(cx, cy, inner, endAngle, startAngle, true);
+            ctx.closePath();
+            ctx.fillStyle = '#000';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, outer, startAngle, endAngle);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(cx, cy, inner, startAngle, endAngle);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+
+            const points = [
+                angleToPoint(startAngle, outer),
+                angleToPoint(startAngle, inner),
+                angleToPoint(endAngle, outer),
+                angleToPoint(endAngle, inner)
+            ];
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            ctx.lineTo(points[1].x, points[1].y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(points[2].x, points[2].y);
+            ctx.lineTo(points[3].x, points[3].y);
+            ctx.stroke();
+
+            // 白色目标标记
+            ctx.beginPath();
+            ctx.arc(cx, cy, outer, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
+            ctx.arc(cx, cy, inner, targetAngle + targetHalfAngle, targetAngle - targetHalfAngle, true);
+            ctx.closePath();
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        }
+
+        // 红色指针
+        if (phase !== 'waiting') {
+            const innerR = radius - 42;
+            const outerR = radius + 42;
+            const midR1 = radius - 4;
+            const midR2 = radius + 4;
+
+            const cos = Math.cos(rotationAngle);
+            const sin = Math.sin(rotationAngle);
+            const nx = -sin;
+            const ny = cos;
+            const halfWidth = 3;
+
+            const innerTip = { x: cx + innerR * cos, y: cy + innerR * sin };
+            const outerTip = { x: cx + outerR * cos, y: cy + outerR * sin };
+            const midInnerL = { x: cx + midR1 * cos + halfWidth * nx, y: cy + midR1 * sin + halfWidth * ny };
+            const midInnerR = { x: cx + midR1 * cos - halfWidth * nx, y: cy + midR1 * sin - halfWidth * ny };
+            const midOuterL = { x: cx + midR2 * cos + halfWidth * nx, y: cy + midR2 * sin + halfWidth * ny };
+            const midOuterR = { x: cx + midR2 * cos - halfWidth * nx, y: cy + midR2 * sin - halfWidth * ny };
+
+            ctx.beginPath();
+            ctx.moveTo(innerTip.x, innerTip.y);
+            ctx.lineTo(midInnerL.x, midInnerL.y);
+            ctx.lineTo(midOuterL.x, midOuterL.y);
+            ctx.lineTo(outerTip.x, outerTip.y);
+            ctx.lineTo(midOuterR.x, midOuterR.y);
+            ctx.lineTo(midInnerR.x, midInnerR.y);
+            ctx.closePath();
+            ctx.fillStyle = 'red';
+            ctx.fill();
+        }
+
+        /* ===== 核心逻辑 ===== */
+        if (phase === 'calibrating') {
+            rotationAngle += rotationSpeed;
+            rotationAngle = normalizeAngle(rotationAngle);
+
+            const ptr = normalizeAngle(rotationAngle);
+            const inThick = angleInRange(ptr, startAngle, endAngle);
+
+            if (!hasEnteredThick) {
+                if (inThick) hasEnteredThick = true;
+                animFrameId = requestAnimationFrame(draw);
+                return;
+            }
+
+            if (!inThick) explode();
+        }
+
+        if (phase === 'dead') {
+            rotationAngle += rotationSpeed * 0.5;
+            rotationAngle = normalizeAngle(rotationAngle);
+        }
+
+        animFrameId = requestAnimationFrame(draw);
+    }
+
+    /* ===== 校准判定 ===== */
+    function calibrate() {
+        if (phase !== 'calibrating') return;
+
+        const ptr = normalizeAngle(rotationAngle);
+        const inThick = angleInRange(ptr, startAngle, endAngle);
+        const inTarget = angleInRange(ptr, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
+
+        if (inTarget) {
+            updateProgress(perfectFill);
+            baseSpeed += speedIncrement;
+            playSfx('perfect');
+        } else if (inThick) {
+            updateProgress(normalFill);
+            baseSpeed += speedIncrement;
+            playSfx('normal');
+        } else {
+            explode();
+            return;
+        }
+
+        if (progress < 1) {
+            nextRound();
+        } else {
+            checkWin();
+        }
+    }
+
+    /* ===== 输入处理 ===== */
+    function onTap() {
+        if (phase === 'waiting') {
+            startGame();
+        } else if (phase === 'calibrating') {
+            calibrate();
+        }
+    }
+
+    // 开局流程：等 1.5 秒后播放开始音效，再进入第一轮
+    function startGame() {
+        phase = 'starting';
+        playSfx('start');
+        setTimeout(() => {
+            nextRound();
+        }, 1500);
+    }
+
+    // 空格键（PC）
+    document.addEventListener('keydown', e => {
+        if (e.code === 'Space' || e.key === ' ') {
+            e.preventDefault();
+            onTap();
+        }
+    });
+
+    // 防重复触发
+    let tapTriggered = false;
+    function onTapWithDebounce() {
+        if (tapTriggered) return;
+        tapTriggered = true;
+        onTap();
+        requestAnimationFrame(() => { tapTriggered = false; });
+    }
+
+    // 点击（PC + 手机）
+    document.addEventListener('click', function(e) {
+        e.preventDefault();
+        onTapWithDebounce();
+    });
+
+    // 触摸（手机）
+    document.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        onTapWithDebounce();
+    }, { passive: false });
+
+    // 阻止双击缩放
+    document.addEventListener('dblclick', function(e) {
+        e.preventDefault();
+    });
+
+    // 阻止iOS长按菜单
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
+
+    // 重开按钮
+    document.getElementById('restartBtnFail').addEventListener('click', function(e) {
+        e.stopPropagation();
+        cancelAnimationFrame(animFrameId);
+        location.reload();
+    });
+    document.getElementById('restartBtnWin').addEventListener('click', function(e) {
+        e.stopPropagation();
+        cancelAnimationFrame(animFrameId);
+        location.reload();
+    });
+
+    // 启动
+    draw();
+</script>
+</body>
+</html>
