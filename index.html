@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>hyc_QTE</title>
+    <title>hyc-QTE</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -149,7 +149,7 @@
 
 <div class="qte-wrapper">
     <div class="status-text" id="statusText">Tap/Space开始！</div>
-    <div class="qte-container" id="gameArea">
+    <div class="qte-container">
         <canvas id="ringCanvas" width="300" height="300"></canvas>
         <div class="hint" id="hintBtn">TAP/SPACE</div>
     </div>
@@ -188,7 +188,6 @@
     const gameOverWin = document.getElementById('gameOverWin');
     const finalRoundFail = document.getElementById('finalRoundFail');
     const finalRoundWin = document.getElementById('finalRoundWin');
-    const gameArea = document.getElementById('gameArea');
 
     const cx = 150, cy = 150, radius = 100;
 
@@ -463,8 +462,23 @@
         }
     }
 
-    /* ===== 输入处理（核心优化点）===== */
-    function onGameTap() {
+    /* ===== 输入处理（核心修改区）===== */
+
+    // 判断是否是重新开始按钮
+    function isRestartButton(target) {
+        return target.closest('#restartBtnFail, #restartBtnWin');
+    }
+
+    // 防重复触发
+    let tapTriggered = false;
+    function onTapWithDebounce() {
+        if (tapTriggered) return;
+        tapTriggered = true;
+        onTap();
+        requestAnimationFrame(() => { tapTriggered = false; });
+    }
+
+    function onTap() {
         if (phase === 'waiting') {
             startGame();
         } else if (phase === 'calibrating') {
@@ -472,27 +486,29 @@
         }
     }
 
-    // 键盘
+    // 键盘：空格 = 点击空白
     document.addEventListener('keydown', e => {
         if (e.code === 'Space' || e.key === ' ') {
             e.preventDefault();
-            onGameTap();
+            onTap();
         }
     });
 
-    // 游戏区域点击（PC）
-    gameArea.addEventListener('click', e => {
+    // 点击：空白 = 空格，按钮除外
+    document.addEventListener('click', e => {
+        if (isRestartButton(e.target)) return;
         e.preventDefault();
-        onGameTap();
+        onTapWithDebounce();
     });
 
-    // 游戏区域触摸（移动端，使用 touchend 更自然）
-    gameArea.addEventListener('touchend', e => {
+    // 触摸：空白 = 空格，按钮除外
+    document.addEventListener('touchstart', e => {
+        if (isRestartButton(e.target)) return;
         e.preventDefault();
-        onGameTap();
+        onTapWithDebounce();
     }, { passive: false });
 
-    // 阻止 iOS 缩放 / 长按菜单（不影响按钮）
+    // 阻止双击缩放 / 长按菜单（不影响按钮）
     document.addEventListener('dblclick', e => e.preventDefault());
     document.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -505,12 +521,14 @@
         }, 1500);
     }
 
-    // 重新开始按钮（不再被全局拦截）
-    document.getElementById('restartBtnFail').addEventListener('click', () => {
+    // 重新开始按钮（完全独立）
+    document.getElementById('restartBtnFail').addEventListener('click', e => {
+        e.stopPropagation();
         cancelAnimationFrame(animFrameId);
         location.reload();
     });
-    document.getElementById('restartBtnWin').addEventListener('click', () => {
+    document.getElementById('restartBtnWin').addEventListener('click', e => {
+        e.stopPropagation();
         cancelAnimationFrame(animFrameId);
         location.reload();
     });
