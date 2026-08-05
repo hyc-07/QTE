@@ -1,592 +1,598 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>hyc_QTE</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            height: 100dvh;
-            font-family: 'Segoe UI', 'PingFang SC', sans-serif;
-            color: #fff;
-            overflow: hidden;
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: manipulation;
-        }
-        .qte-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-        .qte-container {
-            position: relative;
-            width: 300px;
-            height: 300px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        .hint {
-            z-index: 10;
-            font-size: 14px;
-            background: #000;
-            border: 2px solid #aaa;
-            border-radius: 6px;
-            padding: 6px 16px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            font-weight: bold;
-            box-shadow: 0 0 8px rgba(255,255,255,.3);
-            pointer-events: none;
-            opacity: .85;
-        }
-        .progress-bar {
-            width: 210px;
-            height: 6px;
-            background: #222;
-            border: 1px solid #555;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            width: 0%;
-            background: #fff;
-            border-radius: 2px;
-            transition: width .15s ease;
-        }
-        .status-text {
-            display: none;
-            font-size: 16px;
-            height: 24px;
-            color: #ccc;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>hyc_QTE_updata</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      height: 100dvh;
+      font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+      color: #fff;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+    .qte-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .qte-container {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .hint {
+      z-index: 10;
+      font-size: 14px;
+      background: #000;
+      border: 2px solid #aaa;
+      border-radius: 6px;
+      padding: 6px 16px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-weight: bold;
+      box-shadow: 0 0 8px rgba(255,255,255,.3);
+      pointer-events: none;
+      opacity: .85;
+    }
+    .progress-bar {
+      width: 210px;
+      height: 6px;
+      background: #222;
+      border: 1px solid #555;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #fff;
+      border-radius: 2px;
+      transition: width .15s ease;
+    }
+    .status-text {
+      display: none;
+      font-size: 16px;
+      height: 24px;
+      color: #ccc;
+    }
 
-        /* ===== 音效开关 ===== */
-        .sfx-toggle {
-            position: fixed;
-            top: 16px;
-            right: 16px;
-            width: 40px;
-            height: 40px;
-            border: 2px solid #666;
-            border-radius: 8px;
-            background: rgba(20,20,20,.9);
-            color: #fff;
-            font-size: 18px;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            transition: border-color .2s, background .2s;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-        .sfx-toggle:hover {
-            border-color: #999;
-            background: rgba(60,60,60,.9);
-        }
-        .sfx-toggle:active {
-            background: #555;
-        }
+    /* ===== 音效开关 ===== */
+    .sfx-toggle {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      border: 2px solid #666;
+      border-radius: 8px;
+      background: rgba(20,20,20,.9);
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      transition: border-color .2s, background .2s;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .sfx-toggle:hover {
+      border-color: #999;
+      background: rgba(60,60,60,.9);
+    }
+    .sfx-toggle:active {
+      background: #555;
+    }
 
-        /* ===== 结算弹窗 ===== */
-        .game-over {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,.85);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            gap: 0;
-            z-index: 999;
-        }
-        .game-over.show {
-            display: flex;
-        }
+    /* ===== 结算弹窗 ===== */
+    .game-over {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      gap: 0;
+      z-index: 999;
+    }
+    .game-over.show {
+      display: flex;
+    }
 
-        .game-over .panel {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 18px;
-            padding: 40px 50px;
-            border: 2px solid #555;
-            border-radius: 12px;
-            background: rgba(20,20,20,.95);
-            min-width: 280px;
-        }
+    .game-over .panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding: 40px 50px;
+      border: 2px solid #555;
+      border-radius: 12px;
+      background: rgba(20,20,20,.95);
+      min-width: 280px;
+    }
 
-        .game-over h1 {
-            font-size: 36px;
-            font-weight: bold;
-            letter-spacing: 4px;
-            margin: 0;
-        }
-        .game-over.fail h1 { color: #f44; }
-        .game-over.win h1 { color: #0f0; }
+    .game-over h1 {
+      font-size: 36px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      margin: 0;
+    }
+    .game-over.fail h1 { color: #f44; }
+    .game-over.win h1 { color: #0f0; }
 
-        .game-over .subtitle {
-            font-size: 16px;
-            color: #aaa;
-            margin: 0;
-        }
+    .game-over .subtitle {
+      font-size: 16px;
+      color: #aaa;
+      margin: 0;
+    }
 
-        .game-over .stats {
-            font-size: 14px;
-            color: #888;
-            margin: 0;
-        }
+    .game-over .stats {
+      font-size: 14px;
+      color: #888;
+      margin: 0;
+    }
 
-        .game-over button {
-            margin-top: 8px;
-            font-size: 15px;
-            padding: 10px 36px;
-            background: #222;
-            color: #fff;
-            border: 2px solid #666;
-            border-radius: 8px;
-            cursor: pointer;
-            letter-spacing: 2px;
-            transition: background .2s, border-color .2s;
-        }
-        .game-over button:hover {
-            background: #444;
-            border-color: #999;
-        }
-        .game-over button:active {
-            background: #555;
-        }
-    </style>
+    .game-over button {
+      margin-top: 8px;
+      font-size: 15px;
+      padding: 10px 36px;
+      background: #222;
+      color: #fff;
+      border: 2px solid #666;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 2px;
+      transition: background .2s, border-color .2s;
+    }
+    .game-over button:hover {
+      background: #444;
+      border-color: #999;
+    }
+    .game-over button:active {
+      background: #555;
+    }
+  </style>
 </head>
 <body>
 
 <button class="sfx-toggle" id="sfxToggle" title="音效开关">🔊</button>
 
 <div class="qte-wrapper">
-    <div class="status-text" id="statusText">Tap/Space开始！</div>
-    <div class="qte-container" id="gameArea">
-        <canvas id="ringCanvas" width="300" height="300"></canvas>
-        <div class="hint" id="hintBtn">TAP/SPACE</div>
-    </div>
-    <div class="progress-bar">
-        <div class="progress-fill" id="progressFill"></div>
-    </div>
+  <div class="status-text" id="statusText">Tap/Space开始！</div>
+  <div class="qte-container" id="gameArea">
+    <canvas id="ringCanvas" width="300" height="300"></canvas>
+    <div class="hint" id="hintBtn">TAP/SPACE</div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
 </div>
 
 <!-- 失败结算 -->
 <div class="game-over fail" id="gameOverFail">
-    <div class="panel">
-        <h1>校准失败</h1>
-        <p class="subtitle">破译中断</p>
-        <p class="stats" id="finalRoundFail"></p>
-        <button id="restartBtnFail">重新开始</button>
-    </div>
+  <div class="panel">
+    <h1>校准失败</h1>
+    <p class="subtitle">破译中断</p>
+    <p class="stats" id="finalRoundFail"></p>
+    <button id="restartBtnFail">重新开始</button>
+  </div>
 </div>
 
 <!-- 成功结算 -->
 <div class="game-over win" id="gameOverWin">
-    <div class="panel">
-        <h1>校准成功</h1>
-        <p class="subtitle">全部校准完成</p>
-        <p class="stats" id="finalRoundWin"></p>
-        <button id="restartBtnWin">重新开始</button>
-    </div>
+  <div class="panel">
+    <h1>校准成功</h1>
+    <p class="subtitle">全部校准完成</p>
+    <p class="stats" id="finalRoundWin"></p>
+    <button id="restartBtnWin">重新开始</button>
+  </div>
 </div>
-
 <script>
-    const canvas = document.getElementById('ringCanvas');
-    const ctx = canvas.getContext('2d');
-    const progressFill = document.getElementById('progressFill');
-    const statusText = document.getElementById('statusText');
-    const hintBtn = document.getElementById('hintBtn');
-    const gameOverFail = document.getElementById('gameOverFail');
-    const gameOverWin = document.getElementById('gameOverWin');
-    const finalRoundFail = document.getElementById('finalRoundFail');
-    const finalRoundWin = document.getElementById('finalRoundWin');
-    const gameArea = document.getElementById('gameArea');
+  const canvas = document.getElementById('ringCanvas');
+  const ctx = canvas.getContext('2d');
+  const progressFill = document.getElementById('progressFill');
+  const statusText = document.getElementById('statusText');
+  const hintBtn = document.getElementById('hintBtn');
+  const gameOverFail = document.getElementById('gameOverFail');
+  const gameOverWin = document.getElementById('gameOverWin');
+  const finalRoundFail = document.getElementById('finalRoundFail');
+  const finalRoundWin = document.getElementById('finalRoundWin');
+  const gameArea = document.getElementById('gameArea');
 
-    const cx = 150, cy = 150, radius = 100;
+  const cx = 150, cy = 150, radius = 100;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const totalRounds = Math.max(1, parseInt(urlParams.get('rounds')) || 18);
+  const urlParams = new URLSearchParams(window.location.search);
+  const totalRounds = Math.max(1, parseInt(urlParams.get('rounds')) || 20);
 
-    /* ===== 音效系统 ===== */
-    const SFX_FILES = {
-        perfect: 'sfx_perfect.mp3',
-        normal: 'sfx_normal.mp3',
-        start: 'sfx_start.mp3',
-        win: 'sfx_win.mp3',
-        fail: 'sfx_fail.mp3'
-    };
+  // 1. 读取 autoplay 参数（不自动开始，仅用于后续逻辑）
+  const autoplay = urlParams.get('autoplay') === '1';
 
-    const sfx = {};
+  /* ============================================================
+     ===== Web Audio 音效系统 ================================
+     ============================================================ */
+  const SFX_FILES = {
+    perfect: 'sfx_perfect.mp3',
+    normal: 'sfx_normal.mp3',
+    start: 'sfx_start.mp3',
+    win: 'sfx_win.mp3',
+    fail: 'sfx_fail.mp3'
+  };
 
-    // 从 localStorage 读取音效开关状态
-    const STORAGE_KEY = 'qte_sfx_enabled';
-    let sfxEnabled = localStorage.getItem(STORAGE_KEY) !== 'false';
+  let audioCtx = null;
+  const sfxBuffers = {};
+  let sfxEnabled = localStorage.getItem('qte_sfx_enabled') !== 'false';
 
-    /* ===== 音效开关按钮 ===== */
-    const sfxToggleBtn = document.getElementById('sfxToggle');
-    // 初始化图标
+  const sfxToggleBtn = document.getElementById('sfxToggle');
+  sfxToggleBtn.textContent = sfxEnabled ? '🔊' : '🔇';
+
+  sfxToggleBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    sfxEnabled = !sfxEnabled;
     sfxToggleBtn.textContent = sfxEnabled ? '🔊' : '🔇';
+    localStorage.setItem('qte_sfx_enabled', sfxEnabled);
+  });
 
-    sfxToggleBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        sfxEnabled = !sfxEnabled;
-        sfxToggleBtn.textContent = sfxEnabled ? '🔊' : '🔇';
-        // 写入本地存储
-        localStorage.setItem(STORAGE_KEY, sfxEnabled);
-    });
-
-    function initSfx() {
-        for (const [key, file] of Object.entries(SFX_FILES)) {
-            const audio = new Audio(file);
-            audio.preload = 'auto';
-            audio.volume = 1.0;
-            sfx[key] = audio;
-        }
+  async function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
     }
-
-    function playSfx(key) {
-        if (!sfxEnabled) return;
-        const src = sfx[key];
-        if (!src) return;
-        try {
-            const clone = src.cloneNode(true);
-            clone.volume = 1.0;
-            clone.play().catch(() => {});
-        } catch(e) {}
+    for (const [key, url] of Object.entries(SFX_FILES)) {
+      try {
+        const res = await fetch(url);
+        const arrayBuffer = await res.arrayBuffer();
+        sfxBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        console.warn('音效加载失败:', key, e);
+      }
     }
+  }
 
-    function unlockAudio(e) {
-        if (e && e.target && e.target.id === 'sfxToggle') return;
-        if (!sfxEnabled) return;
-        for (const key in sfx) {
-            const a = sfx[key];
-            a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
-        }
-        document.removeEventListener('click', unlockAudio);
-        document.removeEventListener('touchstart', unlockAudio);
-        document.removeEventListener('keydown', unlockAudio);
+  function playSfx(key) {
+    if (!sfxEnabled || !audioCtx || !sfxBuffers[key]) return;
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
     }
+    const source = audioCtx.createBufferSource();
+    source.buffer = sfxBuffers[key];
+    source.connect(audioCtx.destination);
+    source.start(0);
+  }
 
-    initSfx();
-    document.addEventListener('click', unlockAudio, { once: true });
-    document.addEventListener('touchstart', unlockAudio, { once: true });
-    document.addEventListener('keydown', unlockAudio, { once: true });
+  function unlockAudioOnce() {
+    initAudio();
+    document.removeEventListener('click', unlockAudioOnce);
+    document.removeEventListener('touchstart', unlockAudioOnce);
+    document.removeEventListener('keydown', unlockAudioOnce);
+  }
+  document.addEventListener('click', unlockAudioOnce);
+  document.addEventListener('touchstart', unlockAudioOnce);
+  document.addEventListener('keydown', unlockAudioOnce);
 
-    /* ===== 游戏状态变量 ===== */
-    let currentRound = 0;
-    let progress = 0;
-    const normalFill = 1 / totalRounds;
-    const perfectFill = 1.3 / totalRounds;
+  /* ============================================================
+     ===== 游戏逻辑（仅 draw 函数中增加了自动校准判断） ======
+     ============================================================ */
+  let currentRound = 0;
+  let progress = 0;
+  const normalFill = 1 / totalRounds;
+  const perfectFill = 1.3 / totalRounds;
 
-    let rotationAngle = 0;
-    let baseSpeed = 0.06;
-    let rotationSpeed = 0.06;
-    let direction = 1;
+  let rotationAngle = 0;
+  let baseSpeed = 0.06;
+  let rotationSpeed = 0.06;
+  let direction = 1;
 
-    const thickAngle = Math.PI/(180/50);
-    let startAngle, endAngle;
-    const targetHalfAngle = 0.10;
-    let targetAngle;
+  const thickAngle = Math.PI/(180/50);
+  let startAngle, endAngle;
+  const targetHalfAngle = 0.10;
+  let targetAngle;
 
-    let phase = 'waiting';
-    let hasEnteredThick = false;
-    const speedIncrement = 0.004;
-    let animFrameId = null;
+  let phase = 'waiting';
+  let hasEnteredThick = false;
+  const speedIncrement = 0.004;
+  let animFrameId = null;
 
-    /* ===== 工具函数 ===== */
-    function normalizeAngle(a) {
-        while (a < 0) a += Math.PI * 2;
-        while (a >= Math.PI * 2) a -= Math.PI * 2;
-        return a;
-    }
+  function normalizeAngle(a) {
+    while (a < 0) a += Math.PI * 2;
+    while (a >= Math.PI * 2) a -= Math.PI * 2;
+    return a;
+  }
 
-    function angleInRange(a, s, e) {
-        a = normalizeAngle(a);
-        s = normalizeAngle(s);
-        e = normalizeAngle(e);
-        return s <= e ? (a >= s && a <= e) : (a >= s || a <= e);
-    }
+  function angleInRange(a, s, e) {
+    a = normalizeAngle(a);
+    s = normalizeAngle(s);
+    e = normalizeAngle(e);
+    return s <= e ? (a >= s && a <= e) : (a >= s || a <= e);
+  }
 
-    function angleToPoint(a, r) {
-        return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-    }
+  function angleToPoint(a, r) {
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
 
-    /* ===== 生成本轮数据 ===== */
-    function nextRound() {
-        currentRound++;
-        const cur = normalizeAngle(rotationAngle);
-        const dist = Math.PI * (0.5 + Math.random() * 0.35);
-        const thickCenter = normalizeAngle(cur + dist * direction);
+  function nextRound() {
+    currentRound++;
+    const cur = normalizeAngle(rotationAngle);
+    const dist = Math.PI * (0.5 + Math.random() * 0.35);
+    const thickCenter = normalizeAngle(cur + dist * direction);
 
-        startAngle = normalizeAngle(thickCenter - thickAngle / 2);
-        endAngle = normalizeAngle(thickCenter + thickAngle / 2);
+    startAngle = normalizeAngle(thickCenter - thickAngle / 2);
+    endAngle = normalizeAngle(thickCenter + thickAngle / 2);
 
-        const targetRange = thickAngle - targetHalfAngle * 2;
-        targetAngle = normalizeAngle(startAngle + targetHalfAngle + Math.random() * targetRange);
+    const targetRange = thickAngle - targetHalfAngle * 2;
+    targetAngle = normalizeAngle(startAngle + targetHalfAngle + Math.random() * targetRange);
 
-        direction *= -1;
-        rotationSpeed = baseSpeed * direction;
-        phase = 'calibrating';
-        hasEnteredThick = false;
-    }
+    direction *= -1;
+    rotationSpeed = baseSpeed * direction;
+    phase = 'calibrating';
+    hasEnteredThick = false;
+  }
 
-    /* ===== 进度 & 胜负 ===== */
-    function updateProgress(v) {
-        progress = Math.min(progress + v, 1);
-        progressFill.style.width = (progress * 100).toFixed(1) + '%';
-    }
+  function updateProgress(v) {
+    progress = Math.min(progress + v, 1);
+    progressFill.style.width = (progress * 100).toFixed(1) + '%';
+  }
 
-    function checkWin() {
-        phase = 'done';
-        cancelAnimationFrame(animFrameId);
-        playSfx('win');
-        gameOverWin.classList.add('show');
-        finalRoundWin.textContent = `共 ${currentRound} 轮，完成度 100%`;
-    }
+  function checkWin() {
+    phase = 'done';
+    cancelAnimationFrame(animFrameId);
+    playSfx('win');
+    gameOverWin.classList.add('show');
+    finalRoundWin.textContent = `共 ${currentRound} 轮，完成度 100%`;
+  }
 
-    function explode() {
-        phase = 'dead';
-        cancelAnimationFrame(animFrameId);
-        playSfx('fail');
-        gameOverFail.classList.add('show');
-        finalRoundFail.textContent = `破译了 ${currentRound} 轮，进度 ${(progress * 100).toFixed(0)}%`;
-    }
+  function explode() {
+    phase = 'dead';
+    cancelAnimationFrame(animFrameId);
+    playSfx('fail');
+    gameOverFail.classList.add('show');
+    finalRoundFail.textContent = `破译了 ${currentRound} 轮，进度 ${(progress * 100).toFixed(0)}%`;
+  }
 
-    /* ===== 重置游戏（不刷新页面）===== */
-    function resetGame() {
-        cancelAnimationFrame(animFrameId);
-
-        currentRound = 0;
-        progress = 0;
-        rotationAngle = 0;
-        baseSpeed = 0.06;
-        rotationSpeed = 0.06;
-        direction = 1;
-        phase = 'waiting';
-        hasEnteredThick = false;
-
-        progressFill.style.width = '0%';
-        gameOverFail.classList.remove('show');
-        gameOverWin.classList.remove('show');
-
-        draw();
-    }
-
-    /* ===== 绘制 ===== */
-    function draw() {
-        ctx.clearRect(0, 0, 300, 300);
-
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#fff';
-        ctx.stroke();
-
-        if (['calibrating', 'done', 'dead'].includes(phase)) {
-            const outer = radius + 6;
-            const inner = radius - 6;
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, outer, startAngle, endAngle);
-            ctx.arc(cx, cy, inner, endAngle, startAngle, true);
-            ctx.closePath();
-            ctx.fillStyle = '#000';
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, outer, startAngle, endAngle);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#fff';
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, inner, startAngle, endAngle);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#fff';
-            ctx.stroke();
-
-            const points = [
-                angleToPoint(startAngle, outer),
-                angleToPoint(startAngle, inner),
-                angleToPoint(endAngle, outer),
-                angleToPoint(endAngle, inner)
-            ];
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#fff';
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            ctx.lineTo(points[1].x, points[1].y);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(points[2].x, points[2].y);
-            ctx.lineTo(points[3].x, points[3].y);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, outer, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
-            ctx.arc(cx, cy, inner, targetAngle + targetHalfAngle, targetAngle - targetHalfAngle, true);
-            ctx.closePath();
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-        }
-
-        if (phase !== 'waiting') {
-            const innerR = radius - 42;
-            const outerR = radius + 42;
-            const midR1 = radius - 4;
-            const midR2 = radius + 4;
-
-            const cos = Math.cos(rotationAngle);
-            const sin = Math.sin(rotationAngle);
-            const nx = -sin;
-            const ny = cos;
-            const halfWidth = 3;
-
-            const innerTip = { x: cx + innerR * cos, y: cy + innerR * sin };
-            const outerTip = { x: cx + outerR * cos, y: cy + outerR * sin };
-            const midInnerL = { x: cx + midR1 * cos + halfWidth * nx, y: cy + midR1 * sin + halfWidth * ny };
-            const midInnerR = { x: cx + midR1 * cos - halfWidth * nx, y: cy + midR1 * sin - halfWidth * ny };
-            const midOuterL = { x: cx + midR2 * cos + halfWidth * nx, y: cy + midR2 * sin + halfWidth * ny };
-            const midOuterR = { x: cx + midR2 * cos - halfWidth * nx, y: cy + midR2 * sin - halfWidth * ny };
-
-            ctx.beginPath();
-            ctx.moveTo(innerTip.x, innerTip.y);
-            ctx.lineTo(midInnerL.x, midInnerL.y);
-            ctx.lineTo(midOuterL.x, midOuterL.y);
-            ctx.lineTo(outerTip.x, outerTip.y);
-            ctx.lineTo(midOuterR.x, midOuterR.y);
-            ctx.lineTo(midInnerR.x, midInnerR.y);
-            ctx.closePath();
-            ctx.fillStyle = 'red';
-            ctx.fill();
-        }
-
-        if (phase === 'calibrating') {
-            rotationAngle += rotationSpeed;
-            rotationAngle = normalizeAngle(rotationAngle);
-
-            const ptr = normalizeAngle(rotationAngle);
-            const inThick = angleInRange(ptr, startAngle, endAngle);
-
-            if (!hasEnteredThick) {
-                if (inThick) hasEnteredThick = true;
-                animFrameId = requestAnimationFrame(draw);
-                return;
-            }
-
-            if (!inThick) explode();
-        }
-
-        if (phase === 'dead') {
-            rotationAngle += rotationSpeed * 0.5;
-            rotationAngle = normalizeAngle(rotationAngle);
-        }
-
-        animFrameId = requestAnimationFrame(draw);
-    }
-
-    /* ===== 校准判定 ===== */
-    function calibrate() {
-        if (phase !== 'calibrating') return;
-
-        const ptr = normalizeAngle(rotationAngle);
-        const inThick = angleInRange(ptr, startAngle, endAngle);
-        const inTarget = angleInRange(ptr, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
-
-        if (inTarget) {
-            updateProgress(perfectFill);
-            baseSpeed += speedIncrement;
-            playSfx('perfect');
-        } else if (inThick) {
-            updateProgress(normalFill);
-            baseSpeed += speedIncrement;
-            playSfx('normal');
-        } else {
-            explode();
-            return;
-        }
-
-        if (progress < 1) {
-            nextRound();
-        } else {
-            checkWin();
-        }
-    }
-
-    /* ===== 输入处理 ===== */
-    function onGameTap() {
-        if (phase === 'waiting') {
-            startGame();
-        } else if (phase === 'calibrating') {
-            calibrate();
-        }
-    }
-
-    // 键盘
-    document.addEventListener('keydown', e => {
-        if (e.code === 'Space' || e.key === ' ') {
-            e.preventDefault();
-            onGameTap();
-        }
-    });
-
-    // 游戏区域点击（PC）
-    // 全局点击：空白 / 游戏区均可触发
-    document.addEventListener('click', e => {
-        if (e.target.id === 'sfxToggle') return;
-        e.preventDefault();
-        onGameTap();
-    });
-
-    // 游戏区域触摸（移动端）
-    gameArea.addEventListener('touchend', e => {
-        e.preventDefault();
-        onGameTap();
-    }, { passive: false });
-
-    // 阻止 iOS 缩放 / 长按菜单
-    document.addEventListener('dblclick', e => e.preventDefault());
-    document.addEventListener('contextmenu', e => e.preventDefault());
-
-    // 开局
-    function startGame() {
-        phase = 'starting';
-        playSfx('start');
-        setTimeout(() => {
-            nextRound();
-        }, 1500);
-    }
-
-    // 重新开始按钮 → 不刷新页面，仅重置状态
-    document.getElementById('restartBtnFail').addEventListener('click', e => {
-        e.stopPropagation();
-        resetGame();
-    });
-    document.getElementById('restartBtnWin').addEventListener('click', e => {
-        e.stopPropagation();
-        resetGame();
-    });
-
+  function resetGame() {
+    cancelAnimationFrame(animFrameId);
+    currentRound = 0;
+    progress = 0;
+    rotationAngle = 0;
+    baseSpeed = 0.06;
+    rotationSpeed = 0.06;
+    direction = 1;
+    phase = 'waiting';
+    hasEnteredThick = false;
+    progressFill.style.width = '0%';
+    gameOverFail.classList.remove('show');
+    gameOverWin.classList.remove('show');
     draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, 300, 300);
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+
+    if (['calibrating', 'done', 'dead'].includes(phase)) {
+      const outer = radius + 6;
+      const inner = radius - 6;
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, outer, startAngle, endAngle);
+      ctx.arc(cx, cy, inner, endAngle, startAngle, true);
+      ctx.closePath();
+      ctx.fillStyle = '#000';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, outer, startAngle, endAngle);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, inner, startAngle, endAngle);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+
+      const points = [
+        angleToPoint(startAngle, outer),
+        angleToPoint(startAngle, inner),
+        angleToPoint(endAngle, outer),
+        angleToPoint(endAngle, inner)
+      ];
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      ctx.lineTo(points[1].x, points[1].y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(points[2].x, points[2].y);
+      ctx.lineTo(points[3].x, points[3].y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, outer, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
+      ctx.arc(cx, cy, inner, targetAngle + targetHalfAngle, targetAngle - targetHalfAngle, true);
+      ctx.closePath();
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+
+    if (phase !== 'waiting') {
+      const innerR = radius - 42;
+      const outerR = radius + 42;
+      const midR1 = radius - 4;
+      const midR2 = radius + 4;
+
+      const cos = Math.cos(rotationAngle);
+      const sin = Math.sin(rotationAngle);
+      const nx = -sin;
+      const ny = cos;
+      const halfWidth = 3;
+
+      const innerTip = { x: cx + innerR * cos, y: cy + innerR * sin };
+      const outerTip = { x: cx + outerR * cos, y: cy + outerR * sin };
+      const midInnerL = { x: cx + midR1 * cos + halfWidth * nx, y: cy + midR1 * sin + halfWidth * ny };
+      const midInnerR = { x: cx + midR1 * cos - halfWidth * nx, y: cy + midR1 * sin - halfWidth * ny };
+      const midOuterL = { x: cx + midR2 * cos + halfWidth * nx, y: cy + midR2 * sin + halfWidth * ny };
+      const midOuterR = { x: cx + midR2 * cos - halfWidth * nx, y: cy + midR2 * sin - halfWidth * ny };
+
+      ctx.beginPath();
+      ctx.moveTo(innerTip.x, innerTip.y);
+      ctx.lineTo(midInnerL.x, midInnerL.y);
+      ctx.lineTo(midOuterL.x, midOuterL.y);
+      ctx.lineTo(outerTip.x, outerTip.y);
+      ctx.lineTo(midOuterR.x, midOuterR.y);
+      ctx.lineTo(midInnerR.x, midInnerR.y);
+      ctx.closePath();
+      ctx.fillStyle = 'red';
+      ctx.fill();
+    }
+
+    if (phase === 'calibrating') {
+      rotationAngle += rotationSpeed;
+      rotationAngle = normalizeAngle(rotationAngle);
+
+      const ptr = normalizeAngle(rotationAngle);
+      const inThick = angleInRange(ptr, startAngle, endAngle);
+      const inTarget = angleInRange(ptr, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
+
+      if (!hasEnteredThick) {
+        if (inThick) hasEnteredThick = true;
+        animFrameId = requestAnimationFrame(draw);
+        return;
+      }
+
+      // ===== 关键修改：自动校准逻辑 =====
+      // 仅在 autoplay 模式下，且指针自然转到完美区时触发
+      if (autoplay && inThick && inTarget) {
+        calibrate();
+        animFrameId = requestAnimationFrame(draw);
+        return;
+      }
+      // ==================================
+
+      if (!inThick) explode();
+    }
+
+    if (phase === 'dead') {
+      rotationAngle += rotationSpeed * 0.5;
+      rotationAngle = normalizeAngle(rotationAngle);
+    }
+
+    animFrameId = requestAnimationFrame(draw);
+  }
+
+  function calibrate() {
+    if (phase !== 'calibrating') return;
+
+    const ptr = normalizeAngle(rotationAngle);
+    const inThick = angleInRange(ptr, startAngle, endAngle);
+    const inTarget = angleInRange(ptr, targetAngle - targetHalfAngle, targetAngle + targetHalfAngle);
+
+    if (inTarget) {
+      updateProgress(perfectFill);
+      baseSpeed += speedIncrement;
+      playSfx('perfect');
+    } else if (inThick) {
+      updateProgress(normalFill);
+      baseSpeed += speedIncrement;
+      playSfx('normal');
+    } else {
+      explode();
+      return;
+    }
+
+    if (progress < 1) {
+      nextRound();
+    } else {
+      checkWin();
+    }
+  }
+
+  let lastTapTime = 0;
+  const TAP_THROTTLE = 200;
+
+  function onGameTap() {
+    const now = Date.now();
+    if (now - lastTapTime < TAP_THROTTLE) return;
+    lastTapTime = now;
+
+    if (navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+
+    if (phase === 'waiting') {
+      startGame();
+    } else if (phase === 'calibrating') {
+      calibrate();
+    }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      onGameTap();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (e.target.id === 'sfxToggle') return;
+    e.preventDefault();
+    onGameTap();
+  });
+
+  gameArea.addEventListener('touchstart', e => {
+    e.preventDefault();
+    onGameTap();
+  }, { passive: false });
+
+  document.addEventListener('dblclick', e => e.preventDefault());
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  function startGame() {
+    phase = 'starting';
+    playSfx('start');
+    setTimeout(() => {
+      nextRound();
+    }, 1500);
+  }
+
+  document.getElementById('restartBtnFail').addEventListener('click', e => {
+    e.stopPropagation();
+    resetGame();
+  });
+  document.getElementById('restartBtnWin').addEventListener('click', e => {
+    e.stopPropagation();
+    resetGame();
+  });
+
+  draw();
 </script>
 </body>
 </html>
